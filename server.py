@@ -2,45 +2,29 @@ import os
 import sys
 import uvicorn
 from fastapi import FastAPI
+from mcp.server.fastmcp import FastMCP
 
-# Importación resiliente según versión de mcp
-try:
-    from mcp.server import Server as MCPServer
-except ImportError:
-    try:
-        from mcp.server.fastmcp import FastMCP as MCPServer
-    except ImportError:
-        from mcp.server.mcpserver import MCPServer
-
-# Inicializar la app MCP
-mcp = MCPServer("REA-MCP-Server")
+# Inicializar servidor MCP oficial
+mcp = FastMCP("REA-MCP-Server")
 
 @mcp.tool()
 def analyze_code(query: str) -> str:
-    """Herramienta de análisis de código para REA."""
+    """Herramienta de análisis e ingeniería inversa para REA."""
     return f"Procesando solicitud REA: {query}"
 
-app = FastAPI(title="REA StreamableHTTP MCP Server")
+# Inicializar la aplicación FastAPI
+app = FastAPI(title="REA MCP Server")
 
 @app.get("/")
 def root():
     return {
         "status": "online",
-        "transport": "StreamableHTTP",
+        "mcp_status": "Active",
         "mcp_endpoint": "/mcp"
     }
 
-# Intenta montar la aplicación StreamableHTTP/SSE
-try:
-    if hasattr(mcp, "streamable_http_app"):
-        app.mount("/mcp", mcp.streamable_http_app())
-    elif hasattr(mcp, "sse_app"):
-        app.mount("/mcp", mcp.sse_app())
-    else:
-        app.mount("/mcp", mcp.http_app())
-    print("✅ Transporte MCP montado correctamente en /mcp")
-except Exception as err:
-    print(f"⚠️ Nota al montar endpoint MCP: {err}")
+# Montar el transporte de MCP (compatible con la versión 2.x mediante sse_app)
+app.mount("/mcp", mcp.sse_app())
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
